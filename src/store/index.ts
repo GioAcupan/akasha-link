@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { fetchSchema } from '../services/r2';
 
 export interface AkashaSchema {
-  domains?: string[];
-  mocs?: string[];
+  domains?: any[];
+  mocs?: any[];
   [key: string]: any;
 }
 
@@ -11,13 +11,16 @@ interface AppState {
   schema: AkashaSchema | null;
   isSchemaLoading: boolean;
   schemaError: string | null;
+  pendingImages: string[];
   loadSchema: () => Promise<void>;
+  setPendingImages: (images: string[]) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
   schema: null,
   isSchemaLoading: false,
   schemaError: null,
+  pendingImages: [],
   loadSchema: async () => {
     set({ isSchemaLoading: true, schemaError: null });
     try {
@@ -30,4 +33,5 @@ export const useAppStore = create<AppState>((set) => ({
       });
     }
   },
+  setPendingImages: (images: string[]) => set({ pendingImages: images }),
 }));

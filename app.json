@@ -35,7 +35,19 @@
         }
       ],
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Akasha to access your photos to upload documents."
+        }
+      ],
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "Allow Akasha to scan your documents."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useAppStore } from '../store';
 
-export const SchemaDropdown = () => {
+interface SchemaDropdownProps {
+  onSelect?: (domainId: string, mocId: string) => void;
+}
+
+export const SchemaDropdown = ({ onSelect }: SchemaDropdownProps) => {
   const { schema, isSchemaLoading, schemaError, loadSchema } = useAppStore();
   const [selectedDomainId, setSelectedDomainId] = useState<string>('');
   const [selectedMocId, setSelectedMocId] = useState<string>('');
+
+  useEffect(() => {
+    if (onSelect) {
+      onSelect(selectedDomainId, selectedMocId);
+    }
+  }, [selectedDomainId, selectedMocId]);
 
   if (isSchemaLoading) {
     return <Text style={styles.text}>Loading Schema...</Text>;
@@ -35,7 +45,6 @@ export const SchemaDropdown = () => {
 
   const domains = schema.domains || [];
   
-  // Find the currently selected domain to get its MOCs
   const selectedDomainObj = domains.find((d: any) => d.id === selectedDomainId);
   const mocs = selectedDomainObj?.mocs || [];
 
@@ -49,7 +58,7 @@ export const SchemaDropdown = () => {
             style={[styles.pill, selectedDomainId === d.id && styles.pillSelected]}
             onPress={() => {
               setSelectedDomainId(d.id);
-              setSelectedMocId(''); // reset moc when domain changes
+              setSelectedMocId('');
             }}
           >
             <Text style={[styles.pillText, selectedDomainId === d.id && styles.pillTextSelected]}>
