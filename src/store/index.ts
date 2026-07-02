@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { fetchSchema } from '../services/r2';
+import { getPendingSessions, SessionQueueItem } from '../services/db';
 
 export interface AkashaSchema {
   domains?: any[];
@@ -12,8 +13,13 @@ interface AppState {
   isSchemaLoading: boolean;
   schemaError: string | null;
   pendingImages: string[];
+  isSyncing: boolean;
+  outboxItems: SessionQueueItem[];
   loadSchema: () => Promise<void>;
+  useMockSchema: () => void;
   setPendingImages: (images: string[]) => void;
+  setSyncing: (syncing: boolean) => void;
+  refreshOutbox: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -21,6 +27,8 @@ export const useAppStore = create<AppState>((set) => ({
   isSchemaLoading: false,
   schemaError: null,
   pendingImages: [],
+  isSyncing: false,
+  outboxItems: [],
   loadSchema: async () => {
     set({ isSchemaLoading: true, schemaError: null });
     try {
@@ -33,5 +41,21 @@ export const useAppStore = create<AppState>((set) => ({
       });
     }
   },
+  useMockSchema: () => {
+    set({
+      schemaError: null,
+      schema: {
+        domains: [
+          { id: 'work', label: 'Work', mocs: [{ id: 'meeting-notes', label: 'Meeting Notes' }, { id: 'receipts', label: 'Receipts' }] },
+          { id: 'personal', label: 'Personal', mocs: [{ id: 'journal', label: 'Journal' }, { id: 'health', label: 'Health' }] }
+        ]
+      }
+    });
+  },
   setPendingImages: (images: string[]) => set({ pendingImages: images }),
+  setSyncing: (syncing: boolean) => set({ isSyncing: syncing }),
+  refreshOutbox: async () => {
+    const items = await getPendingSessions();
+    set({ outboxItems: items });
+  }
 }));

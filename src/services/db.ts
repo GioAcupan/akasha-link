@@ -81,3 +81,8 @@ export const updateSessionStatus = async (
     [status, error || null, sessionId]
   );
 };
+
+export const clearAllSessions = async () => {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM session_queue`);
+};

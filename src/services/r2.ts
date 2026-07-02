@@ -1,5 +1,7 @@
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getR2Credentials } from './secureStore';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 
 let s3Client: S3Client | null = null;
 let currentBucket: string | null = null;
@@ -48,4 +50,36 @@ export const fetchSchema = async () => {
   }
   
   return JSON.parse(str);
+};
+
+export const uploadImage = async (uri: string, key: string) => {
+  const { client, bucket } = await getS3Client();
+  
+  // Read file as base64 string
+  const base64Str = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+  // Convert to ArrayBuffer then Uint8Array
+  const arrayBuffer = decode(base64Str);
+  const uint8Array = new Uint8Array(arrayBuffer);
+  
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: uint8Array,
+    ContentType: 'image/jpeg',
+  });
+
+  await client.send(command);
+};
+
+export const uploadManifest = async (key: string, data: any) => {
+  const { client, bucket } = await getS3Client();
+  
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: JSON.stringify(data),
+    ContentType: 'application/json',
+  });
+
+  await client.send(command);
 };

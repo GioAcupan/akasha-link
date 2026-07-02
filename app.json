@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "package": "com.akashalink.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
