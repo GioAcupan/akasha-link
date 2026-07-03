@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, useColorScheme } from 'react-native';
 import { ChevronDown, ChevronUp, Search, Check } from 'lucide-react-native';
 import { useAppStore } from '../store';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 interface SearchableDropdownProps {
   items: any[];
@@ -14,6 +15,10 @@ interface SearchableDropdownProps {
 const SearchableDropdown = ({ items, selectedId, onSelect, placeholder, disabled }: SearchableDropdownProps) => {
   const [expanded, setExpanded] = useState(false);
   const [search, setSearch] = useState('');
+  
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const selectedItem = items.find(i => (i.id || i) === selectedId);
   const selectedLabel = selectedItem ? (selectedItem.label || selectedItem.id || selectedItem) : '';
@@ -30,20 +35,20 @@ const SearchableDropdown = ({ items, selectedId, onSelect, placeholder, disabled
         onPress={() => !disabled && setExpanded(!expanded)}
         activeOpacity={0.7}
       >
-        <Text style={[styles.dropdownHeaderText, !selectedId && { color: '#94A3B8' }]}>
+        <Text style={[styles.dropdownHeaderText, !selectedId && { color: theme.textSecondary }]}>
           {selectedId ? selectedLabel : placeholder}
         </Text>
-        {expanded ? <ChevronUp size={20} color="#64748B" /> : <ChevronDown size={20} color="#64748B" />}
+        {expanded ? <ChevronUp size={20} color={theme.text} /> : <ChevronDown size={20} color={theme.text} />}
       </TouchableOpacity>
 
       {expanded && !disabled && (
         <View style={styles.dropdownBody}>
           <View style={styles.searchRow}>
-            <Search size={16} color="#94A3B8" />
+            <Search size={16} color={theme.textSecondary} />
             <TextInput 
               style={styles.searchInput}
-              placeholder="Search..."
-              placeholderTextColor="#94A3B8"
+              placeholder="SEARCH..."
+              placeholderTextColor={theme.textSecondary}
               value={search}
               onChangeText={setSearch}
               autoCapitalize="none"
@@ -68,12 +73,12 @@ const SearchableDropdown = ({ items, selectedId, onSelect, placeholder, disabled
                   <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>
                     {label}
                   </Text>
-                  {isSelected && <Check size={16} color="#0F172A" />}
+                  {isSelected && <Check size={16} color={theme.primaryText} />}
                 </TouchableOpacity>
               );
             })}
             {filteredItems.length === 0 && (
-              <Text style={styles.noResultsText}>No results found</Text>
+              <Text style={styles.noResultsText}>NO RESULTS FOUND</Text>
             )}
           </ScrollView>
         </View>
@@ -87,9 +92,13 @@ interface SchemaDropdownProps {
 }
 
 export const SchemaDropdown = ({ onSelect }: SchemaDropdownProps) => {
-  const { schema, isSchemaLoading, schemaError, loadSchema, useMockSchema } = useAppStore();
+  const { schema, isSchemaLoading, schemaError, loadSchema } = useAppStore();
   const [selectedDomainId, setSelectedDomainId] = useState<string>('');
   const [selectedMocId, setSelectedMocId] = useState<string>('');
+  
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     if (onSelect) {
@@ -98,21 +107,19 @@ export const SchemaDropdown = ({ onSelect }: SchemaDropdownProps) => {
   }, [selectedDomainId, selectedMocId]);
 
   if (isSchemaLoading) {
-    return <Text style={styles.loadingText}>Loading Schema...</Text>;
+    return <Text style={styles.loadingText}>LOADING SCHEMA...</Text>;
   }
 
   if (schemaError || !schema) {
     return (
       <View style={styles.errorContainer}>
         <Text style={schemaError ? styles.errorText : styles.loadingText}>
-          {schemaError ? `Error: ${schemaError}` : 'Schema not loaded yet.'}
+          {schemaError ? `ERROR: ${schemaError}` : 'SCHEMA NOT LOADED.'}
         </Text>
         <TouchableOpacity style={styles.retryButton} onPress={loadSchema}>
-          <Text style={styles.retryButtonText}>{schemaError ? 'Retry Load' : 'Load Schema'}</Text>
+          <Text style={styles.retryButtonText}>{schemaError ? 'RETRY LOAD' : 'LOAD SCHEMA'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.mockButton} onPress={useMockSchema}>
-          <Text style={styles.mockButtonText}>Use Mock Schema</Text>
-        </TouchableOpacity>
+
       </View>
     );
   }
@@ -123,7 +130,7 @@ export const SchemaDropdown = ({ onSelect }: SchemaDropdownProps) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Domain</Text>
+      <Text style={styles.label}>DOMAIN</Text>
       <SearchableDropdown 
         items={domains}
         selectedId={selectedDomainId}
@@ -131,7 +138,7 @@ export const SchemaDropdown = ({ onSelect }: SchemaDropdownProps) => {
           setSelectedDomainId(id);
           setSelectedMocId(''); // reset MOC when domain changes
         }}
-        placeholder="Select a domain..."
+        placeholder="SELECT A DOMAIN..."
       />
 
       <Text style={styles.label}>MOC</Text>
@@ -139,76 +146,74 @@ export const SchemaDropdown = ({ onSelect }: SchemaDropdownProps) => {
         items={mocs}
         selectedId={selectedMocId}
         onSelect={setSelectedMocId}
-        placeholder={selectedDomainId ? "Select a MOC..." : "Select a domain first"}
+        placeholder={selectedDomainId ? "SELECT A MOC..." : "SELECT A DOMAIN FIRST"}
         disabled={!selectedDomainId}
       />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: any) => StyleSheet.create({
   container: {
     width: '100%',
-    paddingBottom: 10,
+    paddingBottom: Spacing.one,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 8,
-    marginTop: 4,
+    fontFamily: Fonts.display,
+    color: theme.text,
+    marginBottom: Spacing.one,
+    marginTop: Spacing.half,
+    letterSpacing: 0.5,
   },
   dropdownContainer: {
-    marginBottom: 16,
-    zIndex: 10, // helps with nested dropdowns if they were absolute, but these are inline
+    marginBottom: Spacing.two,
+    zIndex: 10,
   },
   dropdownHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.backgroundElement,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.border,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.oneHalf,
   },
   dropdownHeaderDisabled: {
-    backgroundColor: '#F1F5F9',
-    opacity: 0.6,
+    backgroundColor: theme.background,
+    opacity: 0.5,
   },
   dropdownHeaderText: {
-    fontSize: 16,
-    color: '#0F172A',
-    fontWeight: '500',
+    fontSize: 14,
+    color: theme.text,
+    fontFamily: Fonts.sansBold,
+    textTransform: 'uppercase',
   },
   dropdownBody: {
-    marginTop: 8,
-    backgroundColor: '#FFFFFF',
+    marginTop: Spacing.one,
+    backgroundColor: theme.backgroundElement,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
+    borderColor: theme.border,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: Spacing.two,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#F8FAFC',
+    borderBottomColor: theme.border,
+    backgroundColor: theme.backgroundElement,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    fontSize: 15,
-    color: '#0F172A',
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.one,
+    fontSize: 14,
+    color: theme.text,
+    fontFamily: Fonts.display,
   },
   dropdownList: {
     maxHeight: 200,
@@ -217,63 +222,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: theme.background,
   },
   dropdownItemSelected: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: theme.primary,
   },
   dropdownItemText: {
     fontSize: 15,
-    color: '#334155',
+    color: theme.text,
+    fontFamily: Fonts.sans,
+    textTransform: 'uppercase',
   },
   dropdownItemTextSelected: {
-    color: '#0F172A',
-    fontWeight: '600',
+    color: theme.primaryText,
+    fontFamily: Fonts.sansBold,
   },
   noResultsText: {
-    padding: 16,
-    color: '#94A3B8',
+    padding: Spacing.three,
+    color: theme.textSecondary,
     textAlign: 'center',
-    fontStyle: 'italic',
+    fontFamily: Fonts.display,
   },
   errorContainer: {
-    padding: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    padding: Spacing.three,
+    backgroundColor: theme.backgroundElement,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginVertical: 10,
+    borderColor: theme.border,
+    marginVertical: Spacing.two,
   },
   loadingText: {
-    color: '#64748B',
+    color: theme.textSecondary,
+    fontFamily: Fonts.display,
   },
   errorText: {
-    color: '#E11D48',
-    fontWeight: '500',
+    color: theme.dangerText,
+    fontFamily: Fonts.sansBold,
+    backgroundColor: theme.danger,
+    padding: Spacing.one,
   },
   retryButton: {
-    backgroundColor: '#0F172A',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 12,
+    backgroundColor: theme.primary,
+    padding: Spacing.oneHalf,
+    paddingHorizontal: Spacing.three,
+    borderRadius: 9999,
+    marginTop: Spacing.two,
     alignItems: 'center',
   },
   retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    color: theme.primaryText,
+    fontFamily: Fonts.sansBold,
+    letterSpacing: 1,
   },
-  mockButton: {
-    backgroundColor: '#F1F5F9',
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  mockButtonText: {
-    color: '#475569',
-    fontWeight: '600',
-  }
+
 });

@@ -1,63 +1,77 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Theme constants for the Nothing OS-inspired design.
+ * Glassmorphic dark mode with subtle red-to-black gradient accent.
  */
 
 import '@/global.css';
-
 import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
     text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    background: '#FFFFFF',
+    backgroundElement: '#F5F5F5',
+    backgroundSelected: '#E5E5E5',
+    textSecondary: '#666666',
+    textTertiary: '#999999',
+    primary: '#000000',
+    primaryText: '#FFFFFF',
+    danger: '#FF0033',
+    dangerText: '#FFFFFF',
+    success: '#059669',
+    successBg: '#D1FAE5',
+    warning: '#D97706',
+    warningBg: '#FEF3C7',
+    border: '#E5E5E5',
+    glass: 'rgba(245, 245, 245, 0.85)',
+    glassBorder: 'rgba(0, 0, 0, 0.06)',
+    gradientStart: '#FFFFFF',
+    gradientEnd: '#F0F0F0',
   },
   dark: {
-    text: '#ffffff',
+    text: '#FFFFFF',
     background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    backgroundElement: '#111111',
+    backgroundSelected: '#222222',
+    textSecondary: '#888888',
+    textTertiary: '#555555',
+    primary: '#FFFFFF',
+    primaryText: '#000000',
+    danger: '#FF0033',
+    dangerText: '#FFFFFF',
+    success: '#34D399',
+    successBg: 'rgba(52, 211, 153, 0.15)',
+    warning: '#FBBF24',
+    warningBg: 'rgba(251, 191, 36, 0.15)',
+    border: '#1A1A1A',
+    glass: 'rgba(20, 20, 20, 0.75)',
+    glassBorder: 'rgba(255, 255, 255, 0.06)',
+    gradientStart: '#0A0000',
+    gradientEnd: '#000000',
   },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
+export const Fonts = {
+  sans: 'Inter_400Regular',
+  sansMedium: 'Inter_500Medium',
+  sansBold: 'Inter_700Bold',
+  display: 'Doto_400Regular',
+  mono: 'monospace',
+};
+
+export type AppTheme = typeof Colors.light | typeof Colors.dark;
 
 export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
+  half: 4,
+  one: 8,
+  oneHalf: 12,
+  two: 16,
+  twoHalf: 20,
+  three: 24,
+  four: 32,
+  five: 48,
   six: 64,
 } as const;
 

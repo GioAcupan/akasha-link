@@ -1,18 +1,37 @@
-import React from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Alert, Text, View } from 'react-native';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { StyleSheet, ScrollView, TouchableOpacity, Alert, Text, View, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import DocumentScanner from 'react-native-document-scanner-plugin';
-import { Camera, Database, Trash2 } from 'lucide-react-native';
+import { Camera, Trash2 } from 'lucide-react-native';
+import { BlurTargetView } from 'expo-blur';
+import { useNavigation } from 'expo-router';
 
+import GradientBackground from '@/components/GradientBackground';
 import { SchemaDropdown } from '@/components/SchemaDropdown';
 import MetadataModal from '@/components/MetadataModal';
-import { addSession, getPendingSessions, clearAllSessions } from '@/services/db';
+import { clearAllSessions } from '@/services/db';
 import { useAppStore } from '@/store';
+import { TAB_BAR_HEIGHT } from '@/components/app-tabs';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const { setPendingImages } = useAppStore();
+  const { setPendingImages, setActiveBlurTarget } = useAppStore();
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
+
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const localBlurRef = useRef<View>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setActiveBlurTarget(localBlurRef);
+    });
+    if (navigation.isFocused()) {
+      setActiveBlurTarget(localBlurRef);
+    }
+    return unsubscribe;
+  }, [navigation, setActiveBlurTarget]);
 
   const handleCameraCapture = async () => {
     try {
@@ -28,7 +47,6 @@ export default function HomeScreen() {
 
       if (response.scannedImages && response.scannedImages.length > 0) {
         setPendingImages(response.scannedImages);
-        // The MetadataModal will automatically appear because pendingImages.length > 0
       } else {
         Alert.alert('No images', 'The scanner did not return any images. ' + JSON.stringify(response));
       }
@@ -37,115 +55,119 @@ export default function HomeScreen() {
     }
   };
 
-  const testDb = async () => {
-    try {
-      const sessionId = `test_${Date.now()}`;
-      await addSession({
-        sessionId,
-        timestamp: new Date().toISOString(),
-        domain: 'test-domain',
-        mocs: ['test-moc'],
-        imagePaths: ['file:///test.jpg'],
-        status: 'pending'
-      });
-      const sessions = await getPendingSessions();
-      Alert.alert('DB Test Success', `Pending sessions: ${sessions.length}\nLast ID: ${sessions[sessions.length - 1]?.sessionId}`);
-    } catch (e: any) {
-      Alert.alert('DB Test Error', e.message);
-    }
-  };
-
   const handleClearDb = async () => {
-    try {
-      await clearAllSessions();
-      Alert.alert('Database Cleared', 'All sessions have been removed.');
-    } catch (e: any) {
-      Alert.alert('Clear DB Error', e.message);
-    }
+    Alert.alert('CLEAR DATABASE', 'Remove all sessions from the outbox?', [
+      { text: 'CANCEL', style: 'cancel' },
+      { text: 'CLEAR', style: 'destructive', onPress: async () => {
+        try {
+          await clearAllSessions();
+          Alert.alert('CLEARED', 'All sessions removed.');
+        } catch (e: any) {
+          Alert.alert('ERROR', e.message);
+        }
+      }},
+    ]);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.titleText}>Akasha</Text>
-          <Text style={styles.subtitleText}>Capture & Sync</Text>
-        </View>
+    <BlurTargetView ref={localBlurRef} style={{ flex: 1 }}>
+      <GradientBackground>
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+            <View style={styles.header}>
+              <Text style={styles.titleText}>AKASHA</Text>
+              <Text style={styles.subtitleText}>CAPTURE_SYNC</Text>
+            </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>New Session</Text>
-          
-          <TouchableOpacity style={styles.primaryButton} onPress={handleCameraCapture} activeOpacity={0.8}>
-            <Camera color="#fff" size={24} style={styles.btnIcon} />
-            <Text style={styles.primaryButtonText}>Scan Documents</Text>
-          </TouchableOpacity>
-        </View>
+            {/* Scan Card */}
+            <View style={styles.glassCard}>
+              <Text style={styles.cardLabel}>NEW SESSION</Text>
+              <TouchableOpacity style={styles.scanButton} onPress={handleCameraCapture} activeOpacity={0.7}>
+                <Camera color={theme.primaryText} size={20} style={styles.btnIcon} strokeWidth={2.5} />
+                <Text style={styles.scanButtonText}>SCAN DOCUMENTS</Text>
+              </TouchableOpacity>
+            </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Developer Tools</Text>
-          <SchemaDropdown />
-          <TouchableOpacity style={styles.tertiaryButton} onPress={testDb} activeOpacity={0.8}>
-            <Database color="#475569" size={20} style={styles.btnIcon} />
-            <Text style={styles.tertiaryButtonText}>Insert Test Session</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.dangerButton} onPress={handleClearDb} activeOpacity={0.8}>
-            <Trash2 color="#E11D48" size={20} style={styles.btnIcon} />
-            <Text style={styles.dangerButtonText}>Clear Outbox DB</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-      <MetadataModal />
-    </SafeAreaView>
+            {/* Schema Card */}
+            <View style={styles.glassCard}>
+              <Text style={styles.cardLabel}>SCHEMA</Text>
+              <SchemaDropdown />
+            </View>
+
+            {/* Danger Zone */}
+            <TouchableOpacity style={styles.dangerRow} onPress={handleClearDb} activeOpacity={0.7}>
+              <Trash2 color={theme.danger} size={16} strokeWidth={2.5} />
+              <Text style={styles.dangerRowText}>CLEAR DATABASE</Text>
+            </TouchableOpacity>
+          </ScrollView>
+          <MetadataModal />
+        </SafeAreaView>
+      </GradientBackground>
+    </BlurTargetView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
-  container: { padding: 24, gap: 24 },
-  header: { marginTop: 12, marginBottom: 8 },
-  titleText: { fontSize: 32, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
-  subtitleText: { fontSize: 16, color: '#64748B', marginTop: 4, fontWeight: '500' },
-  card: { 
-    backgroundColor: '#FFFFFF', 
+const createStyles = (theme: any) => StyleSheet.create({
+  safeArea: { flex: 1 },
+  container: { paddingHorizontal: Spacing.twoHalf, paddingBottom: TAB_BAR_HEIGHT + Spacing.three },
+  header: { marginTop: Spacing.two, marginBottom: Spacing.twoHalf },
+  titleText: { 
+    fontSize: 36, 
+    fontFamily: Fonts.display, 
+    color: theme.text, 
+    letterSpacing: 2,
+  },
+  subtitleText: { 
+    fontSize: 12, 
+    fontFamily: Fonts.display,
+    color: theme.danger, 
+    marginTop: Spacing.half,
+    letterSpacing: 3,
+  },
+  glassCard: { 
+    backgroundColor: theme.glass, 
     borderRadius: 20, 
-    padding: 24,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 2,
+    padding: Spacing.twoHalf,
     borderWidth: 1,
-    borderColor: '#F1F5F9'
+    borderColor: theme.glassBorder,
+    marginBottom: Spacing.two,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 20 },
-  primaryButton: { 
-    backgroundColor: '#0F172A', 
-    padding: 18, 
-    borderRadius: 16, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  cardLabel: { 
+    fontSize: 11, 
+    fontFamily: Fonts.display, 
+    color: theme.textSecondary,
+    letterSpacing: 2,
+    marginBottom: Spacing.two,
   },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
-  tertiaryButton: { 
-    backgroundColor: '#F1F5F9', 
-    padding: 16, 
+  scanButton: { 
+    backgroundColor: theme.primary, 
+    paddingVertical: Spacing.oneHalf, 
+    paddingHorizontal: Spacing.three,
     borderRadius: 12, 
     flexDirection: 'row', 
     alignItems: 'center', 
-    justifyContent: 'center', 
-    marginTop: 16 
+    justifyContent: 'center',
   },
-  tertiaryButtonText: { color: '#475569', fontSize: 15, fontWeight: '600' },
-  dangerButton: { 
-    backgroundColor: '#FFE4E6', 
-    padding: 16, 
-    borderRadius: 12, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    marginTop: 12 
+  scanButtonText: { 
+    color: theme.primaryText, 
+    fontSize: 14, 
+    fontFamily: Fonts.sansBold,
+    letterSpacing: 1,
   },
-  dangerButtonText: { color: '#E11D48', fontSize: 15, fontWeight: '600' },
-  btnIcon: { marginRight: 12 },
+  dangerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+    paddingVertical: Spacing.two,
+    marginTop: Spacing.two,
+    opacity: 0.65,
+  },
+  dangerRowText: { 
+    color: theme.danger, 
+    fontSize: 14, 
+    fontFamily: Fonts.display,
+    letterSpacing: 1.5,
+  },
+  btnIcon: { marginRight: Spacing.one },
 });

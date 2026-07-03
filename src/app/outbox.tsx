@@ -1,16 +1,38 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Alert, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import { BlurTargetView } from 'expo-blur';
+import { useNavigation } from 'expo-router';
+
 import { registerForPushNotificationsAsync } from '@/services/notifications';
 import { useAppStore } from '@/store';
 import { SyncManager } from '@/services/syncManager';
 import { SessionQueueItem } from '@/services/db';
 import { CloudUpload, Copy } from 'lucide-react-native';
+import GradientBackground from '@/components/GradientBackground';
+import { TAB_BAR_HEIGHT } from '@/components/app-tabs';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function OutboxScreen() {
-  const { isSyncing, outboxItems, refreshOutbox } = useAppStore();
+  const { isSyncing, outboxItems, refreshOutbox, setActiveBlurTarget } = useAppStore();
   const [pushToken, setPushToken] = useState<string>('');
+  
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const localBlurRef = useRef<View>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setActiveBlurTarget(localBlurRef);
+    });
+    if (navigation.isFocused()) {
+      setActiveBlurTarget(localBlurRef);
+    }
+    return unsubscribe;
+  }, [navigation, setActiveBlurTarget]);
 
   useEffect(() => {
     refreshOutbox();
@@ -24,123 +46,137 @@ export default function OutboxScreen() {
 
   const copyToken = async () => {
     await Clipboard.setStringAsync(pushToken);
-    Alert.alert('Copied!', 'Push token copied to clipboard.');
+    Alert.alert('COPIED', 'Push token copied.');
   };
 
   const renderItem = ({ item }: { item: SessionQueueItem }) => {
-    let statusColor = '#0F172A';
-    let bgColor = '#F1F5F9';
-    if (item.status === 'completed') { statusColor = '#059669'; bgColor = '#D1FAE5'; }
-    if (item.status === 'failed') { statusColor = '#E11D48'; bgColor = '#FFE4E6'; }
-    if (item.status === 'uploading') { statusColor = '#D97706'; bgColor = '#FEF3C7'; }
+    let statusColor: string = theme.textSecondary;
+    let statusBg: string = 'transparent';
+    
+    if (item.status === 'completed') { statusColor = theme.success; statusBg = theme.successBg; }
+    if (item.status === 'failed') { statusColor = theme.danger; statusBg = 'rgba(255,0,51,0.12)'; }
+    if (item.status === 'uploading') { statusColor = theme.warning; statusBg = theme.warningBg; }
+    if (item.status === 'pending') { statusColor = theme.textSecondary; statusBg = theme.backgroundElement; }
 
     return (
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{item.domain} / {item.mocs.join(', ')}</Text>
-          <View style={[styles.badge, { backgroundColor: bgColor }]}>
+      <View style={styles.sessionCard}>
+        <View style={styles.sessionRow}>
+          <Text style={styles.sessionDomain} numberOfLines={1}>{item.domain}</Text>
+          <View style={[styles.badge, { backgroundColor: statusBg }]}>
             <Text style={[styles.badgeText, { color: statusColor }]}>{item.status.toUpperCase()}</Text>
           </View>
         </View>
-        <Text style={styles.cardTime}>{new Date(item.timestamp).toLocaleString()}</Text>
-        <Text style={styles.cardId}>{item.sessionId}</Text>
-        {item.error && <Text style={styles.cardError}>{item.error}</Text>}
+        <Text style={styles.sessionMoc}>{item.mocs.join(' \u00b7 ')}</Text>
+        <Text style={styles.sessionTime}>{new Date(item.timestamp).toLocaleString()}</Text>
+        {item.error && <Text style={styles.sessionError}>{item.error}</Text>}
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.header}>Outbox</Text>
-
-        <TouchableOpacity style={styles.tokenBox} onPress={copyToken} activeOpacity={0.7}>
-          <View style={styles.tokenBoxInner}>
-            <View style={styles.tokenHeader}>
-              <Text style={styles.tokenLabel}>Push Token</Text>
-              <Copy color="#64748B" size={16} />
-            </View>
-            <Text style={styles.tokenText} numberOfLines={1} ellipsizeMode="middle">{pushToken || 'Fetching...'}</Text>
+    <BlurTargetView ref={localBlurRef} style={{ flex: 1 }}>
+      <GradientBackground>
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.headerArea}>
+            <Text style={styles.pageTitle}>OUTBOX</Text>
+            
+            <TouchableOpacity style={styles.tokenRow} onPress={copyToken} activeOpacity={0.7}>
+              <Text style={styles.tokenValue} numberOfLines={1} ellipsizeMode="middle">{pushToken || '...'}</Text>
+              <Copy color={theme.textTertiary} size={14} />
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
 
-        <FlatList
-          data={outboxItems}
-          keyExtractor={item => item.sessionId}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.emptyText}>No sessions in outbox.</Text>}
-        />
-      </View>
+          <FlatList
+            data={outboxItems}
+            keyExtractor={item => item.sessionId}
+            renderItem={renderItem}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={<Text style={styles.emptyText}>NO SESSIONS IN OUTBOX.</Text>}
+            showsVerticalScrollIndicator={false}
+          />
 
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.syncBtn, isSyncing && styles.syncBtnDisabled]} 
-          onPress={handleSync}
-          disabled={isSyncing}
-          activeOpacity={0.8}
-        >
-          <CloudUpload color="#fff" size={20} style={{ marginRight: 8 }} />
-          <Text style={styles.syncBtnText}>
-            {isSyncing ? 'SYNCING...' : 'SYNC ALL NOW'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <View style={styles.footer}>
+            <TouchableOpacity 
+              style={[styles.syncBtn, isSyncing && styles.syncBtnDisabled]} 
+              onPress={handleSync}
+              disabled={isSyncing}
+              activeOpacity={0.7}
+            >
+              <CloudUpload color={theme.primaryText} size={18} style={{ marginRight: Spacing.one }} strokeWidth={2.5} />
+              <Text style={styles.syncBtnText}>
+                {isSyncing ? 'SYNCING...' : 'SYNC ALL'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </GradientBackground>
+    </BlurTargetView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 12 },
-  header: { fontSize: 32, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5, marginBottom: 24 },
-  tokenBox: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 16, 
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+const createStyles = (theme: any) => StyleSheet.create({
+  safeArea: { flex: 1 },
+  headerArea: { paddingHorizontal: Spacing.twoHalf, marginTop: Spacing.two },
+  pageTitle: { 
+    fontSize: 36, 
+    fontFamily: Fonts.display, 
+    color: theme.text, 
+    letterSpacing: 2, 
+    marginBottom: Spacing.oneHalf,
   },
-  tokenBoxInner: { padding: 16 },
-  tokenHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  tokenLabel: { fontSize: 14, color: '#0F172A', fontWeight: '600' },
-  tokenText: { fontSize: 12, color: '#64748B', fontFamily: 'monospace' },
-  list: { paddingBottom: 100 },
-  card: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 16, 
-    padding: 16, 
-    marginBottom: 16,
+  tokenRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: Spacing.one,
+    backgroundColor: theme.glass,
+    borderRadius: 8,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.oneHalf,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 1,
+    borderColor: theme.glassBorder,
+    marginBottom: Spacing.two,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 12 },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  cardTime: { fontSize: 13, color: '#64748B', marginBottom: 4, fontWeight: '500' },
-  cardId: { fontSize: 11, color: '#94A3B8', fontFamily: 'monospace' },
-  cardError: { fontSize: 13, color: '#E11D48', marginTop: 8, fontWeight: '500', backgroundColor: '#FFE4E6', padding: 8, borderRadius: 6 },
-  emptyText: { textAlign: 'center', color: '#64748B', marginTop: 40, fontSize: 15 },
+  tokenValue: { 
+    fontSize: 11, 
+    color: theme.textTertiary, 
+    fontFamily: Fonts.mono, 
+    flex: 1,
+  },
+  list: { paddingHorizontal: Spacing.twoHalf, paddingBottom: TAB_BAR_HEIGHT + 60 },
+  sessionCard: { 
+    backgroundColor: theme.glass, 
+    borderRadius: 16, 
+    padding: Spacing.two, 
+    marginBottom: Spacing.oneHalf,
+    borderWidth: 1,
+    borderColor: theme.glassBorder,
+  },
+  sessionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.half },
+  sessionDomain: { fontSize: 14, fontFamily: Fonts.sansBold, color: theme.text, flex: 1, marginRight: Spacing.one },
+  badge: { paddingHorizontal: Spacing.one, paddingVertical: 2, borderRadius: 6 },
+  badgeText: { fontSize: 10, fontFamily: Fonts.display, letterSpacing: 1 },
+  sessionMoc: { fontSize: 12, color: theme.textSecondary, fontFamily: Fonts.sans, marginBottom: Spacing.half },
+  sessionTime: { fontSize: 11, color: theme.textTertiary, fontFamily: Fonts.sans },
+  sessionError: { 
+    fontSize: 12, 
+    color: theme.danger, 
+    marginTop: Spacing.one, 
+    fontFamily: Fonts.sans, 
+  },
+  emptyText: { textAlign: 'center', color: theme.textTertiary, marginTop: Spacing.five, fontSize: 13, fontFamily: Fonts.display, letterSpacing: 2 },
   footer: { 
-    padding: 24, 
-    backgroundColor: '#F8FAFC',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0'
+    paddingHorizontal: Spacing.twoHalf, 
+    paddingTop: Spacing.oneHalf,
+    paddingBottom: TAB_BAR_HEIGHT + Spacing.one,
   },
   syncBtn: {
-    backgroundColor: '#0F172A', 
-    padding: 18, 
-    borderRadius: 16, 
+    backgroundColor: theme.primary, 
+    paddingVertical: Spacing.oneHalf, 
+    borderRadius: 12, 
     flexDirection: 'row',
     alignItems: 'center', 
     justifyContent: 'center',
   },
-  syncBtnDisabled: { backgroundColor: '#94A3B8' },
-  syncBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  syncBtnDisabled: { opacity: 0.4 },
+  syncBtnText: { color: theme.primaryText, fontSize: 14, fontFamily: Fonts.sansBold, letterSpacing: 1 },
 });

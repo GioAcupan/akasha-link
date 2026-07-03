@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,18 +7,44 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  useColorScheme,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import { BlurTargetView } from 'expo-blur';
+import { useNavigation } from 'expo-router';
+
+import GradientBackground from '@/components/GradientBackground';
 import { saveR2Credentials, getR2Credentials, R2Credentials } from '@/services/secureStore';
 import { registerForPushNotificationsAsync } from '@/services/notifications';
+import { useAppStore } from '@/store';
+import { TAB_BAR_HEIGHT } from '@/components/app-tabs';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function SettingsScreen() {
+  const { setActiveBlurTarget } = useAppStore();
   const [endpoint, setEndpoint] = useState('');
   const [bucket, setBucket] = useState('');
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [pushToken, setPushToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const localBlurRef = useRef<View>(null);
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      setActiveBlurTarget(localBlurRef);
+    });
+    if (navigation.isFocused()) {
+      setActiveBlurTarget(localBlurRef);
+    }
+    return unsubscribe;
+  }, [navigation, setActiveBlurTarget]);
 
   useEffect(() => {
     loadSettings();
@@ -41,7 +67,7 @@ export default function SettingsScreen() {
 
   const handleSave = async () => {
     if (!endpoint || !bucket || !accessKey || !secretKey) {
-      Alert.alert('Error', 'Please fill in all R2 credential fields');
+      Alert.alert('ERROR', 'Please fill in all R2 credential fields');
       return;
     }
 
@@ -49,9 +75,9 @@ export default function SettingsScreen() {
     try {
       const creds: R2Credentials = { endpoint, bucket, accessKey, secretKey };
       await saveR2Credentials(creds);
-      Alert.alert('Success', 'Credentials saved successfully!');
+      Alert.alert('SAVED', 'Credentials stored securely.');
     } catch (e) {
-      Alert.alert('Error', 'Failed to save credentials');
+      Alert.alert('ERROR', 'Failed to save credentials');
     } finally {
       setIsLoading(false);
     }
@@ -60,179 +86,200 @@ export default function SettingsScreen() {
   const copyToClipboard = async () => {
     if (pushToken) {
       await Clipboard.setStringAsync(pushToken);
-      Alert.alert('Copied', 'Push token copied to clipboard. Paste this into your desktop .env file.');
+      Alert.alert('COPIED', 'Push token copied.');
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.header}>R2 Credentials</Text>
-      <Text style={styles.description}>
-        Enter your Cloudflare R2 bucket details. These are stored securely on your device.
-      </Text>
+    <BlurTargetView ref={localBlurRef} style={{ flex: 1 }}>
+      <GradientBackground>
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+            <Text style={styles.pageTitle}>SETTINGS</Text>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Endpoint URL</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="https://<account_id>.r2.cloudflarestorage.com"
-          placeholderTextColor="#999"
-          value={endpoint}
-          onChangeText={setEndpoint}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
+            {/* R2 Credentials Card */}
+            <View style={styles.glassCard}>
+              <Text style={styles.cardLabel}>R2 CREDENTIALS</Text>
+              <Text style={styles.cardDescription}>
+                Cloudflare R2 bucket details. Stored securely on-device.
+              </Text>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Bucket Name</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g. akasha-pkm"
-          placeholderTextColor="#999"
-          value={bucket}
-          onChangeText={setBucket}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>ENDPOINT</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="https://<id>.r2.cloudflarestorage.com"
+                  placeholderTextColor={theme.textTertiary}
+                  value={endpoint}
+                  onChangeText={setEndpoint}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Access Key ID</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Your Access Key"
-          placeholderTextColor="#999"
-          value={accessKey}
-          onChangeText={setAccessKey}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>BUCKET</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="akasha-pkm"
+                  placeholderTextColor={theme.textTertiary}
+                  value={bucket}
+                  onChangeText={setBucket}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Secret Access Key</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Your Secret Key"
-          placeholderTextColor="#999"
-          value={secretKey}
-          onChangeText={setSecretKey}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>ACCESS KEY</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Your Access Key ID"
+                  placeholderTextColor={theme.textTertiary}
+                  value={accessKey}
+                  onChangeText={setAccessKey}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-      <TouchableOpacity
-        style={[styles.button, isLoading && styles.buttonDisabled]}
-        onPress={handleSave}
-        disabled={isLoading}
-      >
-        <Text style={styles.buttonText}>{isLoading ? 'Saving...' : 'Save Credentials'}</Text>
-      </TouchableOpacity>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>SECRET KEY</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Your Secret Access Key"
+                  placeholderTextColor={theme.textTertiary}
+                  value={secretKey}
+                  onChangeText={setSecretKey}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-      <View style={styles.divider} />
+              <TouchableOpacity
+                style={[styles.saveButton, isLoading && styles.buttonDisabled]}
+                onPress={handleSave}
+                disabled={isLoading}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.saveButtonText}>{isLoading ? 'SAVING...' : 'SAVE'}</Text>
+              </TouchableOpacity>
+            </View>
 
-      <Text style={styles.header}>Device Sync</Text>
-      <Text style={styles.description}>
-        Your Expo Push Token is used to notify your device of sync events.
-      </Text>
+            {/* Push Token Card */}
+            <View style={styles.glassCard}>
+              <Text style={styles.cardLabel}>PUSH TOKEN</Text>
+              <Text style={styles.cardDescription}>
+                Used by the desktop agent to notify this device.
+              </Text>
 
-      <View style={styles.tokenContainer}>
-        <Text style={styles.tokenText} selectable={true}>
-          {pushToken || 'Fetching token...'}
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, styles.secondaryButton]}
-        onPress={copyToClipboard}
-        disabled={!pushToken}
-      >
-        <Text style={styles.secondaryButtonText}>Copy Push Token</Text>
-      </TouchableOpacity>
-    </ScrollView>
+              <TouchableOpacity style={styles.tokenBox} onPress={copyToClipboard} activeOpacity={0.7}>
+                <Text style={styles.tokenText} numberOfLines={2} ellipsizeMode="middle">
+                  {pushToken || 'Fetching...'}
+                </Text>
+                <Text style={styles.tokenHint}>TAP TO COPY</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </GradientBackground>
+    </BlurTargetView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+const createStyles = (theme: any) => StyleSheet.create({
+  safeArea: { flex: 1 },
   content: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingHorizontal: Spacing.twoHalf,
+    paddingBottom: TAB_BAR_HEIGHT + Spacing.three,
   },
-  header: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#000',
+  pageTitle: {
+    fontSize: 36,
+    fontFamily: Fonts.display,
+    color: theme.text,
+    letterSpacing: 2,
+    marginTop: Spacing.two,
+    marginBottom: Spacing.twoHalf,
   },
-  description: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-    lineHeight: 20,
+  glassCard: {
+    backgroundColor: theme.glass,
+    borderRadius: 20,
+    padding: Spacing.twoHalf,
+    borderWidth: 1,
+    borderColor: theme.glassBorder,
+    marginBottom: Spacing.two,
   },
-  inputGroup: {
-    marginBottom: 16,
+  cardLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.display,
+    color: theme.textSecondary,
+    letterSpacing: 2,
+    marginBottom: Spacing.one,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+  cardDescription: {
+    fontSize: 13,
+    color: theme.textTertiary,
+    lineHeight: 18,
+    fontFamily: Fonts.sans,
+    marginBottom: Spacing.twoHalf,
+  },
+  fieldGroup: {
+    marginBottom: Spacing.two,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontFamily: Fonts.display,
+    color: theme.textSecondary,
+    marginBottom: Spacing.half,
+    letterSpacing: 1,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
+    borderColor: theme.glassBorder,
+    borderRadius: 10,
+    paddingVertical: Spacing.oneHalf,
+    paddingHorizontal: Spacing.two,
+    fontSize: 14,
+    backgroundColor: theme.backgroundElement,
+    color: theme.text,
+    fontFamily: Fonts.sans,
   },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
+  saveButton: {
+    backgroundColor: theme.primary,
+    paddingVertical: Spacing.oneHalf,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: Spacing.one,
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.4,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  saveButtonText: {
+    color: theme.primaryText,
+    fontSize: 14,
+    fontFamily: Fonts.sansBold,
+    letterSpacing: 1,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#eee',
-    marginVertical: 30,
-  },
-  tokenContainer: {
-    backgroundColor: '#f0f0f0',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+  tokenBox: {
+    backgroundColor: theme.backgroundElement,
+    padding: Spacing.two,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.glassBorder,
   },
   tokenText: {
     fontSize: 12,
-    fontFamily: 'monospace',
-    color: '#333',
+    fontFamily: Fonts.mono,
+    color: theme.textSecondary,
+    lineHeight: 18,
   },
-  secondaryButton: {
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  secondaryButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '600',
+  tokenHint: {
+    fontSize: 10,
+    fontFamily: Fonts.display,
+    color: theme.textTertiary,
+    letterSpacing: 1,
+    marginTop: Spacing.one,
+    textAlign: 'right',
   },
 });

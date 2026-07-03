@@ -15,11 +15,13 @@ interface AppState {
   pendingImages: string[];
   isSyncing: boolean;
   outboxItems: SessionQueueItem[];
+  activeBlurTarget: React.RefObject<any> | null;
   loadSchema: () => Promise<void>;
   useMockSchema: () => void;
   setPendingImages: (images: string[]) => void;
   setSyncing: (syncing: boolean) => void;
   refreshOutbox: () => Promise<void>;
+  setActiveBlurTarget: (ref: React.RefObject<any> | null) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -29,6 +31,8 @@ export const useAppStore = create<AppState>((set) => ({
   pendingImages: [],
   isSyncing: false,
   outboxItems: [],
+  activeBlurTarget: null,
+  setActiveBlurTarget: (ref) => set({ activeBlurTarget: ref }),
   loadSchema: async () => {
     set({ isSchemaLoading: true, schemaError: null });
     try {

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Text, Alert, Modal } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Text, Alert, Modal, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppStore } from '../store';
 import { SchemaDropdown } from '@/components/SchemaDropdown';
 import { addSession } from '@/services/db';
+import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function MetadataModal() {
   const { pendingImages, setPendingImages, refreshOutbox } = useAppStore();
@@ -11,13 +12,17 @@ export default function MetadataModal() {
   const [mocId, setMocId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? Colors.dark : Colors.light;
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
   const handleSave = async () => {
     if (!domainId || !mocId) {
-      Alert.alert('Incomplete', 'Please select a Domain and MOC.');
+      Alert.alert('INCOMPLETE', 'Please select a Domain and MOC.');
       return;
     }
     if (pendingImages.length === 0) {
-      Alert.alert('No Images', 'No images were captured.');
+      Alert.alert('NO IMAGES', 'No images were captured.');
       return;
     }
 
@@ -33,24 +38,22 @@ export default function MetadataModal() {
         status: 'pending'
       });
       
-      await refreshOutbox(); // Automatically updates the store so the Outbox screen sees it immediately
+      await refreshOutbox();
       
-      Alert.alert('Success', 'Session saved to Outbox!', [
-        { text: 'OK', onPress: () => {
-          setPendingImages([]); // This will close the modal
-        }}
+      Alert.alert('SAVED', 'Session added to Outbox.', [
+        { text: 'OK', onPress: () => setPendingImages([]) }
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to save session');
+      Alert.alert('ERROR', e.message || 'Failed to save session');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    Alert.alert('Cancel Tagging', 'Are you sure you want to discard these scans?', [
-      { text: 'No', style: 'cancel' },
-      { text: 'Yes, Discard', style: 'destructive', onPress: () => setPendingImages([]) }
+    Alert.alert('DISCARD', 'Discard these scans?', [
+      { text: 'KEEP', style: 'cancel' },
+      { text: 'DISCARD', style: 'destructive', onPress: () => setPendingImages([]) }
     ]);
   };
 
@@ -58,79 +61,106 @@ export default function MetadataModal() {
     <Modal visible={pendingImages.length > 0} animationType="slide" presentationStyle="pageSheet">
       {pendingImages.length > 0 && (
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView contentContainerStyle={styles.container}>
+          <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             <View style={styles.headerRow}>
-              <Text style={styles.title}>Tag Session</Text>
-            <TouchableOpacity onPress={handleCancel}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.title}>TAG</Text>
+              <TouchableOpacity onPress={handleCancel} activeOpacity={0.7}>
+                <Text style={styles.cancelText}>CANCEL</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Thumbnails */}
+            <View style={styles.glassCard}>
+              <Text style={styles.cardLabel}>SCANNED · {pendingImages.length}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {pendingImages.map((uri, idx) => (
+                  <Image key={idx} source={{ uri }} style={styles.thumbnail} />
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Schema */}
+            <View style={styles.glassCard}>
+              <Text style={styles.cardLabel}>METADATA</Text>
+              <SchemaDropdown onSelect={(d, m) => {
+                setDomainId(d);
+                setMocId(m);
+              }} />
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.saveButton, isSaving && styles.disabledButton]} 
+              onPress={handleSave}
+              disabled={isSaving}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.saveButtonText}>{isSaving ? 'SAVING...' : 'SAVE TO OUTBOX'}</Text>
             </TouchableOpacity>
-          </View>
-          
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Scanned Pages</Text>
-            <ScrollView horizontal style={styles.imageScroll} showsHorizontalScrollIndicator={false}>
-              {pendingImages.map((uri, idx) => (
-                <Image key={idx} source={{ uri }} style={styles.thumbnail} />
-              ))}
-              {pendingImages.length === 0 && (
-                <Text style={styles.noImagesText}>No images selected.</Text>
-              )}
-            </ScrollView>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Metadata</Text>
-            <SchemaDropdown onSelect={(d, m) => {
-              setDomainId(d);
-              setMocId(m);
-            }} />
-          </View>
-
-          <TouchableOpacity 
-            style={[styles.saveButton, isSaving && styles.disabledButton]} 
-            onPress={handleSave}
-            disabled={isSaving}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save to Outbox'}</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
+          </ScrollView>
+        </SafeAreaView>
       )}
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
-  container: { padding: 24 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  title: { fontSize: 32, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
-  cancelText: { fontSize: 16, color: '#E11D48', fontWeight: '600' },
-  card: { 
-    backgroundColor: '#FFFFFF', 
-    borderRadius: 20, 
-    padding: 24,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.04,
-    shadowRadius: 16,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-    marginBottom: 20
-  },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 16 },
-  imageScroll: { minHeight: 120 },
-  thumbnail: { width: 90, height: 120, borderRadius: 12, marginRight: 12, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  noImagesText: { color: '#94A3B8', fontStyle: 'italic', alignSelf: 'center', marginTop: 40 },
-  saveButton: { 
-    backgroundColor: '#0F172A', 
-    padding: 18, 
-    borderRadius: 16, 
+const createStyles = (theme: any) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: theme.background },
+  container: { paddingHorizontal: Spacing.twoHalf, paddingBottom: Spacing.five },
+  headerRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginTop: 12 
+    marginTop: Spacing.two,
+    marginBottom: Spacing.three,
   },
-  disabledButton: { backgroundColor: '#94A3B8' },
-  saveButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' }
+  title: { 
+    fontSize: 36, 
+    fontFamily: Fonts.display, 
+    color: theme.text, 
+    letterSpacing: 2,
+  },
+  cancelText: { 
+    fontSize: 13, 
+    fontFamily: Fonts.sansBold, 
+    color: theme.danger,
+    letterSpacing: 1,
+  },
+  glassCard: { 
+    backgroundColor: theme.glass, 
+    borderRadius: 20, 
+    padding: Spacing.twoHalf,
+    borderWidth: 1,
+    borderColor: theme.glassBorder,
+    marginBottom: Spacing.two,
+  },
+  cardLabel: { 
+    fontSize: 11, 
+    fontFamily: Fonts.display, 
+    color: theme.textSecondary,
+    letterSpacing: 2,
+    marginBottom: Spacing.two,
+  },
+  thumbnail: { 
+    width: 72, 
+    height: 96, 
+    borderRadius: 8, 
+    marginRight: Spacing.one, 
+    backgroundColor: theme.backgroundElement, 
+    borderWidth: 1, 
+    borderColor: theme.glassBorder,
+  },
+  saveButton: { 
+    backgroundColor: theme.primary, 
+    paddingVertical: Spacing.oneHalf, 
+    borderRadius: 12, 
+    alignItems: 'center', 
+    marginTop: Spacing.one,
+  },
+  disabledButton: { opacity: 0.4 },
+  saveButtonText: { 
+    color: theme.primaryText, 
+    fontSize: 14, 
+    fontFamily: Fonts.sansBold,
+    letterSpacing: 1,
+  }
 });
